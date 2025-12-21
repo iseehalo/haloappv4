@@ -1,98 +1,286 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+  Dimensions,
+  Image,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { supabase } from '../supabaseClient';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+type TopSong = {
+  id: string;
+  title: string;
+  artist: string;
+  cover_url: string;
+  stream_count: number;
+  owned_copies: number;
+};
 
-export default function HomeScreen() {
+type TopEarner = {
+  id: string;
+  username: string;
+  profile_picture: string | null;
+};
+
+type Notification = {
+  id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  song_cover?: string;
+  user_picture?: string;
+};
+
+const { width: WINDOW_WIDTH } = Dimensions.get('window');
+
+export default function HomePage() {
+  const router = useRouter();
+  const [topSongs, setTopSongs] = useState<TopSong[]>([]);
+  const [topEarners, setTopEarners] = useState<TopEarner[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasUnread, setHasUnread] = useState(true);
+
+  /** ---------------- FETCH TOP SONGS ---------------- **/
+  const fetchTopSongs = async () => {
+    const { data } = await supabase
+      .from('songs')
+      .select(`
+        id,
+        title,
+        artist,
+        cover_url,
+        stream_count,
+        song_copies ( owner )
+      `)
+      .order('stream_count', { ascending: false })
+      .limit(5);
+
+    if (!data) return;
+
+    const formatted = data.map((song: any) => ({
+      id: song.id,
+      title: song.title,
+      artist: song.artist,
+      cover_url: song.cover_url,
+      stream_count: song.stream_count,
+      owned_copies: song.song_copies.filter((c: any) => c.owner !== null).length,
+    }));
+
+    setTopSongs(formatted);
+  };
+
+  /** ---------------- FETCH TOP EARNERS ---------------- **/
+  const fetchTopEarners = async () => {
+    const { data } = await supabase
+      .from('users')
+      .select('id, username, profile_picture')
+      .order('total_earned', { ascending: false })
+      .limit(10);
+
+    if (!data) return;
+    setTopEarners(data);
+  };
+
+  /** ---------------- FETCH NOTIFICATIONS ---------------- **/
+  const fetchNotifications = async () => {
+    const { data } = await supabase
+      .from('notifications')
+      .select('id, content, created_at, user_id')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    if (!data) return;
+
+    const enriched = await Promise.all(
+      data.map(async (noti: any) => {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('username, profile_picture')
+          .eq('id', noti.user_id)
+          .single();
+
+        let songCover;
+        const match = noti.content.match(/"(.+?)"/);
+        if (match) {
+          const { data: songData } = await supabase
+            .from('songs')
+            .select('cover_url')
+            .ilike('title', match[1])
+            .single();
+          songCover = songData?.cover_url;
+        }
+
+        return {
+          ...noti,
+          user_picture: userData?.profile_picture,
+          song_cover: songCover,
+          content: `${noti.content} from ${userData?.username ?? 'someone'}`,
+        };
+      })
+    );
+
+    setNotifications(enriched);
+  };
+
+  const refreshAll = async () => {
+    setRefreshing(true);
+    await fetchTopSongs();
+    await fetchTopEarners();
+    await fetchNotifications();
+    setRefreshing(false);
+  };
+
+  useEffect(() => {
+    fetchTopSongs();
+    fetchTopEarners();
+    fetchNotifications();
+  }, []);
+
+  /** ---------------- CREDIT CALC ---------------- **/
+  const calculateCredits = (streams: number, ownedCopies: number) => {
+    return streams * (0.5 + ownedCopies * 0.25);
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refreshAll} tintColor="#fff" />
+      }
+    >
+      {/* Trending */}
+      <Text style={styles.trendingTitle}>Trending</Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      {topSongs.map((song, index) => {
+        const totalCredits = calculateCredits(song.stream_count, song.owned_copies);
+
+        return (
+          <View key={song.id} style={styles.topSongRow}>
+            <Text style={styles.rank}>{index + 1}</Text>
+            <Image source={{ uri: song.cover_url }} style={styles.cover} />
+            <View style={styles.songInfo}>
+              <Text style={styles.title}>{song.title}</Text>
+              <Text style={styles.artist}>{song.artist}</Text>
+              <Text style={styles.credits}>{totalCredits.toFixed(2)} credits earned</Text>
+            </View>
+          </View>
+        );
+      })}
+
+      {/* Top Earners (Horizontal) */}
+      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Top Earners</Text>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        {topEarners.map((user) => (
+          <TouchableOpacity
+            key={user.id}
+            style={styles.earnerCard}
+            onPress={() => router.push(`/profile/${user.id}`)}
+          >
+            <Image
+              source={{ uri: user.profile_picture || undefined }}
+              style={styles.earnerPic}
+            />
+            <Text style={styles.username}>{user.username}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Notifications */}
+      <View style={styles.notificationsHeader}>
+        <Text style={styles.sectionTitle}>Recent Notifications</Text>
+        <TouchableOpacity
+          onPress={() => {
+            router.push('/components/notifications');
+            setHasUnread(false);
+          }}
+        >
+          <Ionicons name="notifications-outline" size={24} color="#fff" />
+        </TouchableOpacity>
+      </View>
+
+      {notifications.map((noti) => (
+        <View key={noti.id} style={styles.notificationRow}>
+          {noti.user_picture && (
+            <Image source={{ uri: noti.user_picture }} style={styles.notiUserPic} />
+          )}
+          {noti.song_cover && (
+            <Image source={{ uri: noti.song_cover }} style={styles.notiSongCover} />
+          )}
+          <Text style={styles.notificationText}>{noti.content}</Text>
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
+  container: { flex: 1, backgroundColor: '#0a0a0a' },
+  scrollContent: { paddingTop: 40, paddingHorizontal: 16, paddingBottom: 20 },
+
+  trendingTitle: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 20 },
+
+  topSongRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    backgroundColor: '#121212',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 12,
   },
-  stepContainer: {
-    gap: 8,
+
+  rank: { width: 24, color: '#aaa', fontWeight: '700' },
+  cover: { width: 56, height: 56, borderRadius: 8, marginHorizontal: 12 },
+  songInfo: { flex: 1 },
+  title: { color: '#fff', fontWeight: '600' },
+  artist: { color: '#aaa', fontSize: 12 },
+  credits: { color: '#4ade80', fontSize: 12, marginTop: 4 },
+
+  sectionTitle: { color: '#fff', fontSize: 20, fontWeight: '700' },
+
+  earnerCard: {
+    alignItems: 'center',
+    marginRight: 16,
+    marginTop: 12,
+  },
+
+  earnerPic: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#333',
+  },
+
+  username: { color: '#fff', marginTop: 6, fontSize: 12 },
+
+  notificationsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 12,
+  },
+
+  notificationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#121212',
+    padding: 10,
+    borderRadius: 8,
     marginBottom: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
-  },
+
+  notiUserPic: { width: 36, height: 36, borderRadius: 18, marginRight: 8 },
+  notiSongCover: { width: 36, height: 36, borderRadius: 6, marginRight: 8 },
+
+  notificationText: { color: '#fff', flexShrink: 1 },
 });

@@ -1,15 +1,23 @@
 {
   "expo": {
-    "name": "haloappv4",
+    "name": "iseehalo",
     "slug": "haloappv4",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "haloappv4",
+    "icon": "./assets/images/ishlogo4.png",
+    "scheme": "halomusicapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.haloappv4",
+      "buildNumber": "19",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +27,46 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "scheme": "halomusicapp",
+              "host": "auth-callback"
+            }
+          ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ],
+          "data": [
+            {
+              "scheme": "halomusicapp",
+              "host": "auth-callback"
+            }
+          ]
+        }
+      ],
+      "permissions": [
+        "FOREGROUND_SERVICE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "FOREGROUND_SERVICE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
+      "package": "com.anonymous.haloappv4"
     },
     "web": {
       "output": "static",
@@ -38,11 +85,28 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-font",
+      "expo-web-browser",
+      "expo-av"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {
+        "origin": "halomusicapp://"
+      },
+      "eas": {
+        "projectId": "ff22565a-4559-4f44-bcd1-fb0980cc2237"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/ff22565a-4559-4f44-bcd1-fb0980cc2237"
     }
   }
 }
