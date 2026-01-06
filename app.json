@@ -2,7 +2,7 @@
   "expo": {
     "name": "iseehalo",
     "slug": "haloappv4",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/ishlogo4.png",
     "scheme": "halomusicapp",
@@ -11,7 +11,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.haloappv4",
-      "buildNumber": "19",
+      "buildNumber": "25",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [

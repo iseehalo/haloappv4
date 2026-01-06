@@ -5,6 +5,7 @@ import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
+  Linking,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -24,17 +25,21 @@ export default function BuyCopy() {
   }>();
 
   const [sellerName, setSellerName] = useState<string>("");
+  const [isPremium, setIsPremium] = useState(false);
+  const [showUpgrade, setShowUpgrade] = useState(false);
 
   // Fetch seller info
   useEffect(() => {
     const fetchSeller = async () => {
       if (!copy_id) return;
-      const { data: copyData, error } = await supabase
+
+      const { data: copyData } = await supabase
         .from("song_copies")
         .select("owner")
         .eq("id", copy_id)
         .single();
-      if (error || !copyData) return;
+
+      if (!copyData?.owner) return;
 
       const { data: userData } = await supabase
         .from("users")
@@ -44,10 +49,34 @@ export default function BuyCopy() {
 
       if (userData?.username) setSellerName(userData.username);
     };
+
     fetchSeller();
   }, [copy_id]);
 
+  // Fetch premium status (UI only)
+  useEffect(() => {
+    const fetchPremium = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("users")
+        .select("is_premium")
+        .eq("id", user.id)
+        .single();
+
+      setIsPremium(!!data?.is_premium);
+    };
+
+    fetchPremium();
+  }, []);
+
   const handleBuy = async () => {
+    if (!isPremium) {
+      setShowUpgrade(true);
+      return;
+    }
+
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       Alert.alert("Error", "You must be logged in to buy a copy.");
@@ -56,67 +85,14 @@ export default function BuyCopy() {
 
     Alert.alert(
       "Confirm Purchase",
-      `Are you sure you want to buy "${title}" from ${sellerName || "the seller"} for ${listing_price} credits?`,
+      `Are you sure you want to buy "${title}" for ${listing_price} credits?`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Buy",
-          onPress: async () => {
-            try {
-              // Get the current copy info
-              const { data: copyData, error: copyError } = await supabase
-                .from("song_copies")
-                .select("owner, listing_price")
-                .eq("id", copy_id)
-                .single();
-
-              if (copyError || !copyData) {
-                Alert.alert("Error", "Could not find the copy.");
-                return;
-              }
-
-              const sellerId = copyData.owner;
-              const price = copyData.listing_price;
-
-              if (!price) {
-                Alert.alert("Error", "This copy is not for sale.");
-                return;
-              }
-
-              // Check buyer credits
-              const { data: buyerData, error: buyerError } = await supabase
-                .from("users")
-                .select("credits")
-                .eq("id", user.id)
-                .single();
-
-              if (buyerError || !buyerData) {
-                Alert.alert("Error", "Could not fetch your credits.");
-                return;
-              }
-
-              if (buyerData.credits < price) {
-                Alert.alert("Error", "Not enough credits to buy this copy.");
-                return;
-              }
-
-              // Perform purchase via RPC
-              const { error: updateError } = await supabase.rpc("buy_song_copy_by_user", {
-                buyer_uuid: user.id,
-                copy_uuid: copy_id,
-                price_input: price,
-              });
-
-              if (updateError) {
-                Alert.alert("Error", updateError.message);
-                return;
-              }
-
-              Alert.alert("Success", `You bought "${title}" for ${price} credits!`);
-              router.back();
-            } catch (err: any) {
-              Alert.alert("Error", err.message);
-            }
+          onPress: () => {
+            Alert.alert("Success", "Purchase flow continues here.");
+            router.back();
           },
         },
       ]
@@ -141,7 +117,7 @@ export default function BuyCopy() {
           <View style={[styles.cover, { backgroundColor: "#333" }]} />
         )}
 
-        {/* Song Info Card */}
+        {/* Song Info */}
         <View style={styles.infoCard}>
           <Text style={styles.songTitle}>{title}</Text>
           <Text style={styles.seller}>Seller: {sellerName || "Loading..."}</Text>
@@ -149,10 +125,46 @@ export default function BuyCopy() {
         </View>
 
         {/* Buy Button */}
-        <TouchableOpacity style={styles.button} onPress={handleBuy}>
-          <Text style={styles.buttonText}>Buy Now</Text>
+        <TouchableOpacity
+          style={[
+            styles.button,
+            isPremium ? styles.premiumButton : styles.disabledButton,
+          ]}
+          onPress={handleBuy}
+          activeOpacity={isPremium ? 0.7 : 1}
+        >
+          <Text style={styles.buttonText}>
+            {isPremium ? "Buy Now" : "Upgrade to Premium"}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* GRAYED OUT OVERLAY */}
+      {showUpgrade && (
+        <View style={styles.overlay}>
+          <View style={styles.upgradeBox}>
+            <Text style={styles.upgradeTitle}>
+              Upgrade to premium to buy copies
+            </Text>
+
+            <TouchableOpacity
+              style={styles.upgradeBtn}
+              onPress={() =>
+                Linking.openURL("https://iseehalo-web.onrender.com/")
+              }
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>Get Premium</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.upgradeBtn, { marginTop: 12, backgroundColor: "#555" }]}
+              onPress={() => setShowUpgrade(false)}
+            >
+              <Text style={{ color: "#fff", fontWeight: "700" }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -196,7 +208,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     alignItems: "center",
-    marginBottom: 40,
+    marginBottom: 32,
   },
   songTitle: {
     color: "#fff",
@@ -216,15 +228,51 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   button: {
-    backgroundColor: "#1DB954",
     padding: 16,
     borderRadius: 16,
     width: "80%",
     alignItems: "center",
   },
+  premiumButton: {
+    backgroundColor: "#1DB954",
+  },
+  disabledButton: {
+    backgroundColor: "#FF3B30", // keep the red locked look
+  },
   buttonText: {
     color: "#fff",
     fontWeight: "700",
     fontSize: 18,
+  },
+
+  overlay: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  upgradeBox: {
+    backgroundColor: "#1E1E1E",
+    padding: 24,
+    borderRadius: 20,
+    width: "80%",
+    alignItems: "center",
+  },
+  upgradeTitle: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  upgradeBtn: {
+    backgroundColor: "#FF3B30",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 16,
   },
 });

@@ -103,7 +103,6 @@ const Profile = () => {
 
       if (error) throw error;
 
-      // Merge existing ID to avoid overwriting
       setUser({ ...user, ...data });
       setTotalCredits(data.credits || 0);
     } catch (err) {
@@ -230,6 +229,14 @@ const Profile = () => {
           <Text style={styles.buttonText}>Purchased Copies</Text>
         </TouchableOpacity>
 
+        {/* My Orders */}
+        <TouchableOpacity
+          style={[styles.button, { marginTop: 16, backgroundColor: '#444' }]}
+          onPress={() => router.push('/products/orders')}
+        >
+          <Text style={styles.buttonText}>My Orders</Text>
+        </TouchableOpacity>
+
         {/* My Uploaded Songs */}
         <TouchableOpacity
           style={[styles.button, { marginTop: 16, backgroundColor: '#444' }]}
@@ -262,7 +269,10 @@ const Profile = () => {
             />
 
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
-              <TouchableOpacity style={[styles.button, { flex: 1, marginRight: 8 }]} onPress={() => setEditVisible(false)}>
+              <TouchableOpacity
+                style={[styles.button, { flex: 1, marginRight: 8 }]}
+                onPress={() => setEditVisible(false)}
+              >
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
 
@@ -317,7 +327,13 @@ const styles = StyleSheet.create({
   email: { color: '#888', fontSize: 14, marginTop: 8, alignSelf: 'flex-start' },
   label: { color: '#aaa', fontSize: 16 },
   text: { color: '#fff', fontSize: 18, marginBottom: 12 },
-  button: { backgroundColor: '#1DB954', padding: 12, borderRadius: 12, width: '100%', alignItems: 'center' },
+  button: {
+    backgroundColor: '#1DB954',
+    padding: 12,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+  },
   buttonText: { color: '#fff', fontWeight: '600' },
 
   // Modal
