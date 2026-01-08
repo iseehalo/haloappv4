@@ -3,12 +3,9 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, SafeAreaVi
 import * as Linking from 'expo-linking';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '../supabaseClient'; 
-
-// Import the context to check status
 import { usePremium } from '../PremiumContex'; 
 
 export default function PremiumTab() {
-  // Get premium status and loading state
   const { isPremium, loading } = usePremium();
 
   const handleUpgrade = async () => {
@@ -20,23 +17,19 @@ export default function PremiumTab() {
         return;
       }
 
-      // The URL that triggers your Stripe flow on Render
       const webUrl = `https://iseehalo-web.onrender.com/?user_id=${user.id}`;
-      
       const supported = await Linking.canOpenURL(webUrl);
       if (supported) {
         await Linking.openURL(webUrl);
       } else {
         Alert.alert("Error", "Could not open the browser. Please visit iseehalo-web.onrender.com directly.");
       }
-      
     } catch (error) {
       console.error("Link error:", error);
       Alert.alert("Error", "Could not open the upgrade page.");
     }
   };
 
-  // Show a loader while checking the database
   if (loading) {
     return (
       <View style={[styles.safeArea, {justifyContent: 'center', alignItems: 'center'}]}>
@@ -47,65 +40,70 @@ export default function PremiumTab() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+        
+        {/* Header Section */}
         <View style={styles.header}>
-          <FontAwesome5 name="crown" size={50} color="#1DB954" />
-          <Text style={styles.title}>Iseehalo Premium</Text>
-          <Text style={styles.subtitle}>The ultimate music experience</Text>
+          <FontAwesome5 name="crown" size={44} color="#1DB954" style={{ marginBottom: 15 }} />
+          <Text style={styles.mainTitle}>Iseehalo Premium</Text>
+          <Text style={styles.mainSubtitle}>The ultimate music experience</Text>
         </View>
 
-        <View style={styles.card}>
+        {/* Pricing Card */}
+        <View style={styles.pricingCard}>
           {isPremium ? (
-            /* --- WHAT PREMIUM USERS SEE --- */
-            <View style={{ alignItems: 'center', paddingVertical: 20 }}>
-              <FontAwesome5 name="check-circle" size={60} color="#1DB954" />
-              <Text style={[styles.cardTitle, { marginTop: 20, textAlign: 'center' }]}>Premium Active</Text>
-              <Text style={[styles.featureText, { textAlign: 'center', marginLeft: 0 }]}>
+            /* --- PREMIUM ACTIVE STATE --- */
+            <View style={{ alignItems: 'center', paddingVertical: 10 }}>
+              <FontAwesome5 name="check-circle" size={50} color="#1DB954" />
+              <Text style={styles.planTitle}>Premium Active</Text>
+              <Text style={styles.termsText}>
                 You are currently a Premium member. Thank you for supporting Iseehalo!
               </Text>
             </View>
           ) : (
-            /* --- WHAT FREE USERS SEE --- */
+           
             <>
-              <Text style={styles.cardTitle}>Individual Premium</Text>
-              <Text style={styles.featureText}> $7.99/month</Text>
-              
-              <View style={styles.featureRow}>
-                <FontAwesome5 name="dot" size={15} color="#1DB954" />
-                <Text style={styles.featureText}> 1 Premium account</Text>
-              </View>
-              
-              <View style={styles.featureRow}>
-                <FontAwesome5 name="dot" size={15} color="#1DB954" />
-                <Text style={styles.featureText}>Access to the Credit System</Text>
+              <Text style={styles.planTitle}>Individual Premium</Text>
+              <Text style={styles.priceText}>$7.99 / month</Text>
+
+              <View style={styles.featureList}>
+                <View style={styles.featureRow}>
+                  <FontAwesome5 name="check" size={14} color="#1DB954" />
+                  <Text style={styles.featureText}>1 Premium account</Text>
+                </View>
+                <View style={styles.featureRow}>
+                  <FontAwesome5 name="check" size={14} color="#1DB954" />
+                  <Text style={styles.featureText}>Access to the Credit System</Text>
+                </View>
+                <View style={styles.featureRow}>
+                  <FontAwesome5 name="check" size={14} color="#1DB954" />
+                  <Text style={styles.featureText}>Access to the Trading System</Text>
+                </View>
+                <View style={styles.featureRow}>
+                  <FontAwesome5 name="check" size={14} color="#1DB954" />
+                  <Text style={styles.featureText}>Cancel Anytime</Text>
+                </View>
               </View>
 
-              <View style={styles.featureRow}>
-                <FontAwesome5 name="dot" size={15} color="#1DB954" />
-                <Text style={styles.featureText}>Access to the Trading System</Text>
-              </View>
-
-              <View style={styles.featureRow}>
-                <FontAwesome5 name="dot" size={15} color="#1DB954" />
-                <Text style={styles.featureText}>Cancel Anytime</Text>
-              </View>
-
-              <TouchableOpacity style={styles.button} onPress={handleUpgrade}>
+              <TouchableOpacity 
+                style={styles.premiumButton} 
+                activeOpacity={0.8}
+                onPress={handleUpgrade}
+              >
                 <Text style={styles.buttonText}>Get Premium</Text>
               </TouchableOpacity>
-              
-              <Text style={styles.footerText}>By clicking this button you'll be taken to our website.</Text>
+
+              <Text style={styles.termsText}>
+                By clicking this button you'll be taken to our website. Terms apply.
+              </Text>
             </>
           )}
         </View>
 
-        {!isPremium && (
-          <View style={styles.infoBox}>
-            <Text style={styles.infoText}>
-              Clicking 'Get Premium' will take you to our website. Iseehalo Premium offer includes access to the credit system, trading system, and the ultimate exclusive music experience. 
-            </Text>
-          </View>
-        )}
+        <Text style={styles.footerNote}>
+          Experience music like never before with exclusive releases and priority access.
+        </Text>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -113,17 +111,37 @@ export default function PremiumTab() {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: '#000' },
-  container: { flex: 1 },
-  header: { paddingVertical: 50, alignItems: 'center' },
-  title: { color: '#fff', fontSize: 32, fontWeight: 'bold', marginTop: 15 },
-  subtitle: { color: '#888', fontSize: 16, marginTop: 5 },
-  card: { backgroundColor: '#121212', marginHorizontal: 20, padding: 30, borderRadius: 20, borderWidth: 1, borderColor: '#333' },
-  cardTitle: { color: '#fff', fontSize: 22, fontWeight: 'bold', marginBottom: 25 },
-  featureRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
-  featureText: { color: '#fff', marginLeft: 15, fontSize: 16, lineHeight: 22 },
-  button: { backgroundColor: '#1DB954', paddingVertical: 18, borderRadius: 35, marginTop: 20, alignItems: 'center' },
-  buttonText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
-  footerText: { color: '#666', textAlign: 'center', marginTop: 20, fontSize: 12 },
-  infoBox: { padding: 40 },
-  infoText: { color: '#444', textAlign: 'center', fontSize: 13, lineHeight: 20 }
+  container: { flex: 1, paddingHorizontal: 16 },
+  header: { alignItems: 'center', marginTop: 40, marginBottom: 30 },
+  mainTitle: { color: '#fff', fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  mainSubtitle: { color: '#A7A7A7', fontSize: 16, marginTop: 4, fontWeight: '500' },
+  
+  pricingCard: { 
+    backgroundColor: '#121212', // Lighter than background to pop
+    borderRadius: 12, 
+    padding: 24, 
+    borderWidth: 1, 
+    borderColor: '#282828', // Subtle border for definition
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+  },
+  planTitle: { color: '#fff', fontSize: 22, fontWeight: '700', marginBottom: 6 },
+  priceText: { color: '#fff', fontSize: 16, fontWeight: '600', marginBottom: 20 },
+  
+  featureList: { marginBottom: 25 },
+  featureRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
+  featureText: { color: '#fff', marginLeft: 12, fontSize: 15, fontWeight: '500' },
+  
+  premiumButton: { 
+    backgroundColor: '#1DB954', // Spotify Green
+    paddingVertical: 14, 
+    borderRadius: 25, 
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  buttonText: { color: '#000', fontSize: 16, fontWeight: '700' }, // Black text on Green is more professional
+  termsText: { color: '#A7A7A7', fontSize: 12, textAlign: 'center', lineHeight: 18 },
+  footerNote: { color: '#535353', fontSize: 13, textAlign: 'center', marginTop: 40, paddingHorizontal: 20 }
 });
