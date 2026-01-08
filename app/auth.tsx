@@ -51,7 +51,7 @@ const Auth = () => {
 
   // Helper: generate unique username
   async function generateUniqueUsername() {
-  let uname = ''; // Initialize with an empty string here
+  let uname = ''; 
   let exists = true;
 
   while (exists) {
@@ -81,9 +81,9 @@ const Auth = () => {
     
     // Create an object that fits your specific state requirements
     setProfilePic({
-      uri: asset.uri,
-      name: asset.name,
-      type: asset.mimeType || 'image/jpeg' // Map mimeType to your 'type' field
+      uri: res.assets[0].uri,
+      name: res.assets[0].name,
+      type: res.assets[0].mimeType || 'image/jpeg' 
     });
   } else {
     Alert.alert('No image selected');
