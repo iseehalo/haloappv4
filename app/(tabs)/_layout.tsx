@@ -175,6 +175,16 @@ export default function Layout() {
             }}
           />
           <Tabs.Screen
+            name="premium"
+            options={{ 
+              title: 'Premium', 
+              headerShown: false,
+              tabBarIcon: ({ color }) => <IconSymbol name="crown" size={28} color={color} /> 
+            }}
+          />
+
+          
+          <Tabs.Screen
             name="profile"
             options={{ 
               title: 'Profile', 

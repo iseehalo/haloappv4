@@ -51,30 +51,44 @@ const Auth = () => {
 
   // Helper: generate unique username
   async function generateUniqueUsername() {
-    let uname: string;
-    let exists = true;
+  let uname = ''; // Initialize with an empty string here
+  let exists = true;
 
-    while (exists) {
-      uname = 'user_' + Math.floor(100000 + Math.random() * 900000); // 6-digit suffix
-      const { data, error } = await supabase
-        .from('users')
-        .select('id')
-        .eq('username', uname)
-        .maybeSingle();
+  while (exists) {
+    uname = 'user_' + Math.floor(100000 + Math.random() * 900000);
+    const { data, error } = await supabase
+      .from('users')
+      .select('id')
+      .eq('username', uname)
+      .maybeSingle();
 
-      if (!error && !data) {
-        exists = false;
-      }
+    if (!error && !data) {
+      exists = false;
     }
-    return uname;
   }
+  return uname; 
+}
 
   // ------------------- FILE PICKER -------------------
   const pickProfilePic = async () => {
-    const res = await DocumentPicker.getDocumentAsync({ type: 'image/*', copyToCacheDirectory: true });
-    if (!res.canceled && res.assets.length > 0) setProfilePic(res.assets[0]);
-    else Alert.alert('No image selected');
-  };
+  const res = await DocumentPicker.getDocumentAsync({ 
+    type: 'image/*', 
+    copyToCacheDirectory: true 
+  });
+
+  if (!res.canceled && res.assets.length > 0) {
+    const asset = res.assets[0];
+    
+    // Create an object that fits your specific state requirements
+    setProfilePic({
+      uri: asset.uri,
+      name: asset.name,
+      type: asset.mimeType || 'image/jpeg' // Map mimeType to your 'type' field
+    });
+  } else {
+    Alert.alert('No image selected');
+  }
+};
 
   // ------------------- SIGN IN -------------------
   const signIn = async () => {
@@ -97,47 +111,55 @@ const Auth = () => {
 
   // ------------------- EMAIL AUTH BEFORE ACCOUNT CREATION -------------------
   const startAccountCreation = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Enter email and password first');
+  if (!email || !password) {
+    Alert.alert('Error', 'Enter email and password first');
+    return;
+  }
+  setLoading(true);
+  try {
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      Alert.alert('Error', error.message);
+      setLoading(false);
       return;
     }
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({ email, password });
-      if (error) {
-        Alert.alert('Error', error.message);
-        setLoading(false);
-        return;
-      }
 
-      if (data.user) {
-        // Generate username
-        const genUsername = await generateUniqueUsername();
+    if (data.user) {
+      // Generate username
+      const genUsername = await generateUniqueUsername();
 
-        // Default profile picture
-        const defaultProfilePic =
-          'https://eanzstoycfuxqguwjuom.supabase.co/storage/v1/object/public/iseehalo%20songs/profile-icon-design-free-vector.jpg';
+      // Default profile picture
+      const defaultProfilePic =
+        'https://eanzstoycfuxqguwjuom.supabase.co/storage/v1/object/public/iseehalo%20songs/profile-icon-design-free-vector.jpg';
 
-        // Insert user row
-        const { error: insertError } = await supabase
-          .from('users')
-          .insert([{ id: data.user.id, email: data.user.email, username: genUsername, profile_picture: defaultProfilePic }]);
-        if (insertError) throw insertError;
+      // ADDED is_premium AND platform HERE
+      const { error: insertError } = await supabase
+        .from('users')
+        .insert([{ 
+          id: data.user.id, 
+          email: data.user.email, 
+          username: genUsername, 
+          profile_picture: defaultProfilePic,
+          is_premium: false, // Default to false for new users
+          platform: 'free'   // Default platform status
+        }]);
 
-        Alert.alert('Welcome!', `Your username is ${genUsername}. Please sign in to continue.`);
-      }
+      if (insertError) throw insertError;
 
-      // Reset state and go back to sign-in
-      setStep(0);
-      setEmail('');
-      setPassword('');
-    } catch (err: any) {
-      console.error(err);
-      Alert.alert('Error', err.message);
-    } finally {
-      setLoading(false);
+      Alert.alert('Welcome!', `Your username is ${genUsername}. Please sign in to continue.`);
     }
-  };
+
+    // Reset state and go back to sign-in
+    setStep(0);
+    setEmail('');
+    setPassword('');
+  } catch (err: any) {
+    console.error(err);
+    Alert.alert('Error', err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ------------------- UPLOAD PROFILE PIC -------------------
   const uploadProfilePic = async (userId: string) => {
