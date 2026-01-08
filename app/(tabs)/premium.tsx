@@ -4,11 +4,11 @@ import * as Linking from 'expo-linking';
 import { FontAwesome5 } from '@expo/vector-icons';
 import { supabase } from '../supabaseClient'; 
 
-// ✅ Import the context to check status
+// Import the context to check status
 import { usePremium } from '../PremiumContex'; 
 
 export default function PremiumTab() {
-  // ✅ Get premium status and loading state
+  // Get premium status and loading state
   const { isPremium, loading } = usePremium();
 
   const handleUpgrade = async () => {
@@ -67,33 +67,34 @@ export default function PremiumTab() {
           ) : (
             /* --- WHAT FREE USERS SEE --- */
             <>
-              <Text style={styles.cardTitle}>Premium Features</Text>
+              <Text style={styles.cardTitle}>Individual Premium</Text>
+              <Text style={styles.featureText}> $7.99/month</Text>
               
               <View style={styles.featureRow}>
-                <FontAwesome5 name="check" size={18} color="#1DB954" />
-                <Text style={styles.featureText}>Ad-free music listening</Text>
+                <FontAwesome5 name="dot" size={15} color="#1DB954" />
+                <Text style={styles.featureText}> 1 Premium account</Text>
               </View>
               
               <View style={styles.featureRow}>
-                <FontAwesome5 name="check" size={18} color="#1DB954" />
+                <FontAwesome5 name="dot" size={15} color="#1DB954" />
                 <Text style={styles.featureText}>Access to the Credit System</Text>
               </View>
 
               <View style={styles.featureRow}>
-                <FontAwesome5 name="check" size={18} color="#1DB954" />
-                <Text style={styles.featureText}>High-quality audio</Text>
+                <FontAwesome5 name="dot" size={15} color="#1DB954" />
+                <Text style={styles.featureText}>Access to the Trading System</Text>
               </View>
 
               <View style={styles.featureRow}>
-                <FontAwesome5 name="check" size={18} color="#1DB954" />
-                <Text style={styles.featureText}>Unlimited skips</Text>
+                <FontAwesome5 name="dot" size={15} color="#1DB954" />
+                <Text style={styles.featureText}>Cancel Anytime</Text>
               </View>
 
               <TouchableOpacity style={styles.button} onPress={handleUpgrade}>
-                <Text style={styles.buttonText}>GET PREMIUM</Text>
+                <Text style={styles.buttonText}>Get Premium</Text>
               </TouchableOpacity>
               
-              <Text style={styles.footerText}>Only $9.99/month. Recurring billing. Cancel anytime.</Text>
+              <Text style={styles.footerText}>By clicking this button you'll be taken to our website.</Text>
             </>
           )}
         </View>
@@ -101,7 +102,7 @@ export default function PremiumTab() {
         {!isPremium && (
           <View style={styles.infoBox}>
             <Text style={styles.infoText}>
-              Clicking 'Get Premium' will take you to our secure checkout page on the web to complete your purchase via Stripe.
+              Clicking 'Get Premium' will take you to our website. Iseehalo Premium offer includes access to the credit system, trading system, and the ultimate exclusive music experience. 
             </Text>
           </View>
         )}
