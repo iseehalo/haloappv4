@@ -5,18 +5,21 @@ import React, { useEffect, useState } from "react";
 import {
   Alert,
   Image,
-  Linking,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
+  Modal,
+  Pressable,
 } from "react-native";
 import { supabase } from "../supabaseClient";
+import { usePremium } from "../PremiumContex"; // Using the context for consistency
 
 export default function BuyCopy() {
   const router = useRouter();
+  const { isPremium } = usePremium();
   const { copy_id, title, cover_url, listing_price } = useLocalSearchParams<{
     copy_id: string;
     title: string;
@@ -25,8 +28,7 @@ export default function BuyCopy() {
   }>();
 
   const [sellerName, setSellerName] = useState<string>("");
-  const [isPremium, setIsPremium] = useState(false);
-  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [upsellVisible, setUpsellVisible] = useState(false);
 
   // Fetch seller info
   useEffect(() => {
@@ -53,30 +55,16 @@ export default function BuyCopy() {
     fetchSeller();
   }, [copy_id]);
 
-  // Fetch premium status (UI only)
-  useEffect(() => {
-    const fetchPremium = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data } = await supabase
-        .from("users")
-        .select("is_premium")
-        .eq("id", user.id)
-        .single();
-
-      setIsPremium(!!data?.is_premium);
-    };
-
-    fetchPremium();
-  }, []);
-
-  const handleBuy = async () => {
+  const handleBuyPress = () => {
     if (!isPremium) {
-      setShowUpgrade(true);
-      return;
+      // Show the Spotify-style upsell instead of a hard error or external link
+      setUpsellVisible(true);
+    } else {
+      confirmPurchase();
     }
+  };
 
+  const confirmPurchase = async () => {
     const { data: { user }, error: userError } = await supabase.auth.getUser();
     if (userError || !user) {
       Alert.alert("Error", "You must be logged in to buy a copy.");
@@ -124,155 +112,99 @@ export default function BuyCopy() {
           <Text style={styles.price}>{listing_price} credits</Text>
         </View>
 
-        {/* Buy Button */}
+        {/* Buy Button - Always looks active, but gates by premium */}
         <TouchableOpacity
-          style={[
-            styles.button,
-            isPremium ? styles.premiumButton : styles.disabledButton,
-          ]}
-          onPress={handleBuy}
-          activeOpacity={isPremium ? 0.7 : 1}
+          style={styles.buyButton}
+          onPress={handleBuyPress}
+          activeOpacity={0.8}
         >
-          <Text style={styles.buttonText}>
-            {isPremium ? "Buy Now" : "Upgrade to Premium"}
-          </Text>
+          <Text style={styles.buttonText}>Buy Now</Text>
         </TouchableOpacity>
       </ScrollView>
 
-      {/* GRAYED OUT OVERLAY */}
-      {showUpgrade && (
-        <View style={styles.overlay}>
-          <View style={styles.upgradeBox}>
-            <Text style={styles.upgradeTitle}>
-              Upgrade to premium to buy copies
+      {/* --- Spotify-Style Upsell Modal --- */}
+      <Modal 
+        animationType="slide" 
+        transparent={true} 
+        visible={upsellVisible}
+        onRequestClose={() => setUpsellVisible(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setUpsellVisible(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.dragHandle} />
+            
+            <View style={styles.modalBrandRow}>
+               <Image source={require('../../assets/images/ishlogo4.png')} style={styles.miniLogo} />
+               <Text style={styles.premiumLabel}>PREMIUM</Text>
+            </View>
+
+            <Image source={{ uri: cover_url || '' }} style={styles.upsellImage} />
+
+            <Text style={styles.upsellTitle}>Want to buy this copy?</Text>
+            <Text style={styles.upsellSubtitle}>
+              The Trading System and song ownership are exclusive Premium features. 
+              Upgrade to start your collection and support artists.
             </Text>
 
-            <TouchableOpacity
-              style={styles.upgradeBtn}
-              onPress={() =>
-                Linking.openURL("https://iseehalo-web.onrender.com/")
-              }
+            <TouchableOpacity 
+              style={styles.exploreButton}
+              onPress={() => {
+                setUpsellVisible(false);
+                router.push('/premium'); 
+              }}
             >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>Get Premium</Text>
+              <Text style={styles.exploreButtonText}>Explore Premium</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.upgradeBtn, { marginTop: 12, backgroundColor: "#555" }]}
-              onPress={() => setShowUpgrade(false)}
+            <TouchableOpacity 
+              style={styles.dismissButton} 
+              onPress={() => setUpsellVisible(false)}
             >
-              <Text style={{ color: "#fff", fontWeight: "700" }}>Cancel</Text>
+              <Text style={styles.dismissText}>Dismiss</Text>
             </TouchableOpacity>
-          </View>
-        </View>
-      )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#121212",
-  },
-  container: {
-    alignItems: "center",
-    padding: 16,
-    paddingBottom: 40,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
-    marginBottom: 24,
-  },
-  backBtn: {
-    padding: 6,
-    borderRadius: 20,
-    backgroundColor: "rgba(255,255,255,0.1)",
-    marginRight: 12,
-  },
-  headerTitle: {
-    color: "#fff",
-    fontSize: 20,
-    fontWeight: "700",
-  },
-  cover: {
-    width: 250,
-    height: 250,
-    borderRadius: 16,
-    marginBottom: 24,
-  },
-  infoCard: {
-    width: "90%",
-    backgroundColor: "#1E1E1E",
-    borderRadius: 16,
-    padding: 20,
-    alignItems: "center",
-    marginBottom: 32,
-  },
-  songTitle: {
-    color: "#fff",
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: 8,
-    textAlign: "center",
-  },
-  seller: {
-    color: "#aaa",
-    fontSize: 16,
-    marginBottom: 12,
-  },
-  price: {
-    color: "#1DB954",
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  button: {
-    padding: 16,
-    borderRadius: 16,
-    width: "80%",
-    alignItems: "center",
-  },
-  premiumButton: {
-    backgroundColor: "#1DB954",
-  },
-  disabledButton: {
-    backgroundColor: "#FF3B30", // keep the red locked look
-  },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 18,
-  },
+  safeArea: { flex: 1, backgroundColor: "#000" },
+  container: { alignItems: "center", padding: 16, paddingBottom: 40 },
+  header: { flexDirection: "row", alignItems: "center", width: "100%", marginBottom: 24, marginTop: 10 },
+  backBtn: { padding: 8, borderRadius: 20, backgroundColor: "rgba(255,255,255,0.1)", marginRight: 12 },
+  headerTitle: { color: "#fff", fontSize: 20, fontWeight: "700" },
+  cover: { width: 280, height: 280, borderRadius: 16, marginBottom: 24 },
+  infoCard: { width: "100%", backgroundColor: "#1E1E1E", borderRadius: 16, padding: 20, alignItems: "center", marginBottom: 32 },
+  songTitle: { color: "#fff", fontSize: 22, fontWeight: "700", marginBottom: 8, textAlign: "center" },
+  seller: { color: "#aaa", fontSize: 16, marginBottom: 12 },
+  price: { color: "#1DB954", fontSize: 20, fontWeight: "600" },
+  
+  buyButton: { backgroundColor: "#1DB954", padding: 18, borderRadius: 30, width: "100%", alignItems: "center" },
+  buttonText: { color: "#000", fontWeight: "700", fontSize: 18 },
 
-  overlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.7)",
-    justifyContent: "center",
-    alignItems: "center",
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'flex-end' },
+  modalContent: { 
+    backgroundColor: '#121212', 
+    borderTopLeftRadius: 28, 
+    borderTopRightRadius: 28, 
+    padding: 24, 
+    alignItems: 'center', 
+    paddingBottom: 60,
+    borderWidth: 1,
+    borderColor: '#282828'
   },
-  upgradeBox: {
-    backgroundColor: "#1E1E1E",
-    padding: 24,
-    borderRadius: 20,
-    width: "80%",
-    alignItems: "center",
-  },
-  upgradeTitle: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "700",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  upgradeBtn: {
-    backgroundColor: "#FF3B30",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 16,
-  },
+  dragHandle: { width: 40, height: 4, backgroundColor: '#444', borderRadius: 2, marginBottom: 20 },
+  modalBrandRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  miniLogo: { width: 18, height: 18, marginRight: 8 },
+  premiumLabel: { color: '#1DB954', fontWeight: 'bold', fontSize: 12, letterSpacing: 2 },
+  upsellImage: { width: 180, height: 180, borderRadius: 12, marginBottom: 25 },
+  upsellTitle: { color: '#fff', fontSize: 22, fontWeight: '800', textAlign: 'center', marginBottom: 10 },
+  upsellSubtitle: { color: '#A7A7A7', fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 30, paddingHorizontal: 15 },
+  exploreButton: { backgroundColor: '#1DB954', width: '100%', paddingVertical: 16, borderRadius: 30, alignItems: 'center' },
+  exploreButtonText: { color: '#000', fontSize: 16, fontWeight: 'bold' },
+  dismissButton: { marginTop: 20, paddingVertical: 10, width: '100%', alignItems: 'center' },
+  dismissText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });
