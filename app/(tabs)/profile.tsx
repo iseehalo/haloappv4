@@ -14,6 +14,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from 'react-native';
 import { supabase } from '../supabaseClient';
 
@@ -24,6 +25,7 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Modal state for editing
   const [editVisible, setEditVisible] = useState(false);
@@ -39,9 +41,17 @@ const Profile = () => {
         const {
           data: { user: authUser },
         } = await supabase.auth.getUser();
+        
         if (!authUser) {
           setLoading(false);
           return;
+        }
+
+        // --- ADMIN CHECK ---
+        // Replace this string with your ID from Supabase Auth Dashboard
+        const MY_ADMIN_ID = "2664d72a-4db6-4e41-8963-949bafed8922";
+        if (authUser.id === MY_ADMIN_ID) {
+          setIsAdmin(true);
         }
 
         const { data: profile, error: profileError } = await supabase
@@ -87,11 +97,7 @@ const Profile = () => {
   }, []);
 
   const onRefresh = useCallback(async () => {
-    if (!user?.id) {
-      console.warn("Skipping refresh: user.id missing");
-      setRefreshing(false);
-      return;
-    }
+    if (!user?.id) return setRefreshing(false);
 
     setRefreshing(true);
     try {
@@ -165,7 +171,7 @@ const Profile = () => {
   if (loading)
     return (
       <View style={styles.container}>
-        <Text style={styles.text}>Loading user info...</Text>
+        <ActivityIndicator size="large" color="#1DB954" />
       </View>
     );
 
@@ -221,31 +227,41 @@ const Profile = () => {
           <Text style={[styles.text, { color: '#1DB954' }]}>{totalCredits.toFixed(2)}</Text>
         </View>
 
-        {/* Purchased Copies Button */}
-        <TouchableOpacity
-          style={[styles.button, { marginTop: 24, backgroundColor: '#444' }]}
-          onPress={() => router.push('/PurchasedCopies')}
+        {/* Navigation Buttons */}
+        <TouchableOpacity 
+           style={[styles.button, styles.navButton]} 
+           onPress={() => router.push('/PurchasedCopies' as any)}
         >
           <Text style={styles.buttonText}>Purchased Copies</Text>
         </TouchableOpacity>
 
-        {/* My Orders */}
-        <TouchableOpacity
-          style={[styles.button, { marginTop: 16, backgroundColor: '#444' }]}
-          onPress={() => router.push('/products/orders')}
+        <TouchableOpacity 
+           style={[styles.button, styles.navButton]} 
+           onPress={() => router.push('/products/orders' as any)}
         >
           <Text style={styles.buttonText}>My Orders</Text>
         </TouchableOpacity>
 
-        {/* My Uploaded Songs */}
-        <TouchableOpacity
-          style={[styles.button, { marginTop: 16, backgroundColor: '#444' }]}
-          onPress={() => router.push(`/MySongs?userId=${user.id}`)}
+        <TouchableOpacity 
+           style={[styles.button, styles.navButton]} 
+           onPress={() => router.push(`/MySongs?userId=${user.id}` as any)}
         >
           <Text style={styles.buttonText}>My Uploaded Songs</Text>
         </TouchableOpacity>
 
-        {/* Sign Out */}
+        {/* --- ADMIN BROADCAST BUTTON --- */}
+        {isAdmin && (
+          <TouchableOpacity
+            style={[styles.button, { marginTop: 24, backgroundColor: '#FF3B30' }]}
+            onPress={() => router.push('/admin_push' as any)}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="megaphone" size={18} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.buttonText}>Broadcast Center (Admin)</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity style={[styles.button, { marginTop: 24 }]} onPress={signOut}>
           <Text style={styles.buttonText}>Sign Out</Text>
         </TouchableOpacity>
@@ -256,10 +272,8 @@ const Profile = () => {
         <View style={styles.modalBackdrop}>
           <View style={styles.modalContainer}>
             <Text style={styles.modalTitle}>Edit Profile</Text>
-
             <Text style={styles.modalLabel}>Username</Text>
             <TextInput style={styles.modalInput} value={newUsername} onChangeText={setNewUsername} />
-
             <Text style={styles.modalLabel}>Bio</Text>
             <TextInput
               style={[styles.modalInput, { height: 80 }]}
@@ -267,15 +281,10 @@ const Profile = () => {
               onChangeText={setNewBio}
               multiline
             />
-
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 }}>
-              <TouchableOpacity
-                style={[styles.button, { flex: 1, marginRight: 8 }]}
-                onPress={() => setEditVisible(false)}
-              >
+              <TouchableOpacity style={[styles.button, { flex: 1, marginRight: 8 }]} onPress={() => setEditVisible(false)}>
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.button, { flex: 1, marginLeft: 8 }]}
                 onPress={async () => {
@@ -286,7 +295,6 @@ const Profile = () => {
                       .update({ username: newUsername, bio: newBio })
                       .eq('id', user.id);
                     if (error) throw error;
-
                     setUser({ ...user, username: newUsername, bio: newBio });
                     setEditVisible(false);
                   } catch (err: any) {
@@ -313,59 +321,19 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#000', padding: 16, alignItems: 'center' },
   topContainer: { flexDirection: 'row', alignItems: 'center', marginTop: 32 },
   profilePic: { width: 80, height: 80, borderRadius: 40 },
-  cameraIcon: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    backgroundColor: '#1DB954',
-    padding: 4,
-    borderRadius: 16,
-  },
+  cameraIcon: { position: 'absolute', bottom: 0, right: 0, backgroundColor: '#1DB954', padding: 4, borderRadius: 16 },
   userInfo: { marginLeft: 16, flex: 1 },
   username: { color: '#fff', fontSize: 18, fontWeight: '700' },
   bio: { color: '#aaa', fontSize: 14, marginTop: 4 },
   email: { color: '#888', fontSize: 14, marginTop: 8, alignSelf: 'flex-start' },
   label: { color: '#aaa', fontSize: 16 },
   text: { color: '#fff', fontSize: 18, marginBottom: 12 },
-  button: {
-    backgroundColor: '#1DB954',
-    padding: 12,
-    borderRadius: 12,
-    width: '100%',
-    alignItems: 'center',
-  },
+  button: { backgroundColor: '#1DB954', padding: 12, borderRadius: 12, width: '100%', alignItems: 'center' },
+  navButton: { marginTop: 16, backgroundColor: '#444' },
   buttonText: { color: '#fff', fontWeight: '600' },
-
-  // Modal
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    zIndex: 999,
-  },
-  modalContainer: {
-    backgroundColor: '#121212',
-    padding: 16,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  modalTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
+  modalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', zIndex: 999 },
+  modalContainer: { backgroundColor: '#121212', padding: 16, borderTopLeftRadius: 16, borderTopRightRadius: 16 },
+  modalTitle: { color: '#fff', fontSize: 18, fontWeight: '700', marginBottom: 12 },
   modalLabel: { color: '#aaa', fontSize: 14, marginTop: 8 },
-  modalInput: {
-    color: '#fff',
-    borderBottomWidth: 1,
-    borderColor: '#1DB954',
-    fontSize: 16,
-    marginTop: 4,
-    paddingVertical: 4,
-  },
+  modalInput: { color: '#fff', borderBottomWidth: 1, borderColor: '#1DB954', fontSize: 16, marginTop: 4, paddingVertical: 4 },
 });

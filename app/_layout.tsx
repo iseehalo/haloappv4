@@ -6,24 +6,22 @@ import { StatusBar } from "expo-status-bar";
 import React, { useEffect, useRef } from "react";
 import { ActivityIndicator, Platform, View, Alert } from "react-native";
 import * as Linking from "expo-linking";
+import Constants from 'expo-constants'; // Added for ProjectID
 import "react-native-reanimated";
 import { supabase } from "./supabaseClient";
 
-// Lato fonts
+// Fonts & Context
 import { Lato_400Regular, Lato_700Bold, useFonts } from "@expo-google-fonts/lato";
 import { useColorScheme } from "@/hooks/use-color-scheme";
-
-// ✅ 1. Import your new Premium Context
 import { PremiumProvider, usePremium } from "./PremiumContex";
 
 export const unstable_settings = { anchor: "(tabs)" };
 
-// FIXED: TypeScript Notification Handler properties added
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
     shouldPlaySound: true,
-    shouldSetBadge: false,
+    shouldSetBadge: true, // Enabled for badge support
     shouldShowBanner: true,
     shouldShowList: true,
   }),
@@ -40,7 +38,6 @@ export default function RootLayout() {
     );
   }
 
-  // ✅ 2. Wrap everything in the PremiumProvider
   return (
     <PremiumProvider>
       <LayoutContent />
@@ -48,99 +45,80 @@ export default function RootLayout() {
   );
 }
 
-/**
- * We create a separate component for the content so we can 
- * use the 'usePremium' hook inside it.
- */
 function LayoutContent() {
   const colorScheme = useColorScheme();
   const router = useRouter();
   const url = Linking.useURL();
-  
-  // ✅ 3. Pull the refresh function from your Context
   const { refreshStatus } = usePremium();
 
-  const notificationListener = useRef<any>(null);
-  const responseListener = useRef<any>(null);
-  const realtimeChannel = useRef<any>(null);
+  // FIX: Properly typed refs for notification subscriptions
+  const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
+  const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
-  // --- Handle Deep Linking (The "Spotify Flow" Return Trip) ---
   useEffect(() => {
     if (url) {
       const { path } = Linking.parse(url);
       if (path === "success") {
-        // ✅ 4. Re-check the database immediately so the UI unlocks
         refreshStatus();
-
         Alert.alert(
           "Premium Activated 🎉", 
-          "Your account status has been updated. You can now use the credit system!",
+          "Your account status has been updated.",
           [{ text: "Great!", onPress: () => router.replace("/(tabs)") }]
         );
       }
     }
   }, [url]);
 
-  // --- Notifications & Realtime Logic (Kept from your original) ---
   useEffect(() => {
-    let userId: string | null = null;
+    let isMounted = true;
 
-    (async () => {
-      try {
-        const token = await registerForPushNotificationsAsync();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          userId = user.id;
-          if (token) {
-            await supabase.from("users").update({ expo_push_token: token }).eq("id", user.id);
-          }
+    async function initializePush() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-          realtimeChannel.current = supabase
-            .channel(`public:notifications_user_${user.id}`)
-            .on(
-              "postgres_changes",
-              {
-                event: "INSERT",
-                schema: "public",
-                table: "notifications",
-                filter: `user_id=eq.${user.id}`,
-              },
-              (payload) => {
-                Notifications.scheduleNotificationAsync({
-                  content: {
-                    title: "New Notification",
-                    body: payload.new.content,
-                    sound: "default",
-                  },
-                  trigger: null,
-                });
-              }
-            )
-            .subscribe();
-        }
-      } catch (err) {
-        console.warn("Notification setup error:", err);
+      const token = await registerForPushNotificationsAsync();
+      
+      if (token && isMounted) {
+        await supabase
+          .from("user_push_data")
+          .upsert({ 
+            user_id: user.id, 
+            expo_push_token: token, 
+            updated_at: new Date() 
+          });
       }
-    })();
+    }
 
-    notificationListener.current = Notifications.addNotificationReceivedListener((notification) => {
-      console.log("Notification received:", notification);
+    initializePush();
+
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log("Notification Received:", notification);
     });
 
-    responseListener.current = Notifications.addNotificationResponseReceivedListener((response) => {
-      console.log("Notification tapped:", response);
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      if (data?.screen) {
+        router.push(data.screen as any); 
+      } else {
+        router.push("/(tabs)/notifications" as any); 
+      }
     });
 
     return () => {
-      if (notificationListener.current) notificationListener.current.remove();
-      if (responseListener.current) responseListener.current.remove();
-      if (realtimeChannel.current) supabase.removeChannel(realtimeChannel.current);
+      isMounted = false;
+      // FIX: Standard cleanup for Expo Notifications
+      if (notificationListener.current) {
+        notificationListener.current.remove();
+      }
+      if (responseListener.current) {
+       responseListener.current.remove();
+      }
     };
   }, []);
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <View style={{ flex: 1, paddingHorizontal: 10, backgroundColor: "#000" }}>
+      <View style={{ flex: 1, backgroundColor: "#000" }}>
         <Stack screenOptions={{ headerShown: false }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="upload/index" options={{ presentation: "modal" }} />
@@ -153,12 +131,8 @@ function LayoutContent() {
   );
 }
 
-/** Helper: ask permission + return Expo push token */
-async function registerForPushNotificationsAsync(): Promise<string | null> {
-  let token: string | null = null;
-
+async function registerForPushNotificationsAsync() {
   if (!Device.isDevice) {
-    console.warn("Push notifications require a physical device.");
     return null;
   }
 
@@ -171,21 +145,30 @@ async function registerForPushNotificationsAsync(): Promise<string | null> {
   }
 
   if (finalStatus !== "granted") {
-    console.warn("Permission for push notifications not granted.");
     return null;
   }
 
-  const tokenResponse = await Notifications.getExpoPushTokenAsync();
-  token = tokenResponse.data;
+  // FIX: Dynamic Project ID lookup from app.json
+  const projectId = 
+    Constants?.expoConfig?.extra?.eas?.projectId ?? 
+    Constants?.easConfig?.projectId ?? 
+    "ff22565a-4559-4f44-bcd1-fb0980cc2237"; // Fallback to your ID
 
-  if (Platform.OS === "android") {
-    await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#FF231F7C",
-    });
+  try {
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    
+    if (Platform.OS === "android") {
+      Notifications.setNotificationChannelAsync("default", {
+        name: "default",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: "#1DB954",
+      });
+    }
+
+    return token;
+  } catch (e) {
+    console.error("Token error:", e);
+    return null;
   }
-
-  return token;
 }

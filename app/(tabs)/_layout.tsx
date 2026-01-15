@@ -10,7 +10,7 @@ import { ActivityIndicator, View } from 'react-native';
 import Auth from '../auth';
 import { supabase } from '../supabaseClient';
 
-// --- Player Context ---
+// --- Player Context Types ---
 type Song = {
   id: string;
   title: string;
@@ -38,6 +38,9 @@ export default function Layout() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  
+  // --- Notification Badge State ---
+  const [unreadCount, setUnreadCount] = useState(0);
 
   // Player state
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -59,18 +62,55 @@ export default function Layout() {
     }).catch(console.error);
   }, []);
 
-  // 👤 Auth listener
+  // 👤 Auth & Notification Listener
   useEffect(() => {
-    const fetchUser = async () => {
+    const initializeAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      
+      if (user) {
+        fetchUnreadCount(user.id);
+        setupNotificationSubscription(user.id);
+      }
+      
       setLoading(false);
     };
-    fetchUser();
+
+    const fetchUnreadCount = async (userId: string) => {
+      // For now, we count all logs. Later you can add an 'is_read' column to filter.
+      const { count, error } = await supabase
+        .from('notifications_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+      
+      if (!error && count !== null) setUnreadCount(count);
+    };
+
+    const setupNotificationSubscription = (userId: string) => {
+      supabase
+        .channel(`unread-notifications-${userId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications_log',
+            filter: `user_id=eq.${userId}`,
+          },
+          () => {
+            setUnreadCount((prev) => prev + 1);
+          }
+        )
+        .subscribe();
+    };
+
+    initializeAuth();
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) fetchUnreadCount(session.user.id);
     });
+
     return () => listener.subscription.unsubscribe();
   }, []);
 
@@ -82,15 +122,11 @@ export default function Layout() {
 
   if (!user) return <Auth />;
 
-  // --- Player functions ---
+  // --- Player functions (unchanged) ---
   const playSong = async (song: Song) => {
     if (!song.audio_url) return;
-
     try {
-      if (sound) {
-        try { await sound.stopAsync(); await sound.unloadAsync(); } catch {}
-      }
-
+      if (sound) { try { await sound.stopAsync(); await sound.unloadAsync(); } catch {} }
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: song.audio_url },
         { shouldPlay: true },
@@ -102,16 +138,10 @@ export default function Layout() {
           }
         }
       );
-
       setSound(newSound);
       setCurrentSong(song);
       setIsPlaying(true);
-      setPositionMillis(0);
-      setDurationMillis(0);
-
-    } catch (error) {
-      console.error('Error playing song:', error);
-    }
+    } catch (error) { console.error('Error playing song:', error); }
   };
 
   const togglePlayPause = async () => {
@@ -125,72 +155,53 @@ export default function Layout() {
     setCurrentSong(null);
     setSound(null);
     setIsPlaying(false);
-    setPositionMillis(0);
-    setDurationMillis(0);
-  };
-
-  const contextValue: PlayerContextType = {
-    currentSong,
-    playSong,
-    togglePlayPause,
-    closePlayer,
-    isPlaying,
-    positionMillis,
-    durationMillis,
   };
 
   return (
-    <PlayerContext.Provider value={contextValue}>
+    <PlayerContext.Provider value={{ currentSong, playSong, togglePlayPause, closePlayer, isPlaying, positionMillis, durationMillis }}>
       <View style={{ flex: 1 }}>
         <Tabs
           screenOptions={{
             tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
             headerShown: false,
             tabBarButton: HapticTab,
-            tabBarStyle: { backgroundColor: '#000' },
+            tabBarStyle: { backgroundColor: '#000', borderTopWidth: 0 },
           }}
         >
           <Tabs.Screen
             name="index"
-            options={{ 
-              title: 'Home', 
-              headerShown: false,
-              tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} /> 
-            }}
+            options={{ title: 'Home', tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} /> }}
           />
           <Tabs.Screen
             name="explore"
-            options={{ 
-              title: 'Shop', 
-              headerShown: false,
-              tabBarIcon: ({ color }) => <IconSymbol size={28} name="cart.fill" color={color} /> 
-            }}
+            options={{ title: 'Shop', tabBarIcon: ({ color }) => <IconSymbol size={28} name="cart.fill" color={color} /> }}
           />
+          
+          {/* --- NEW NOTIFICATIONS TAB --- */}
           <Tabs.Screen
-            name="search"
+            name="notifications"
             options={{ 
-              title: 'Search', 
-              headerShown: false,
-              tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} /> 
+              title: 'Inbox', 
+              tabBarIcon: ({ color }) => <IconSymbol size={28} name="bell.fill" color={color} />,
+              tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+              tabBarBadgeStyle: { backgroundColor: '#FF3B30' }
             }}
-          />
-          <Tabs.Screen
-            name="premium"
-            options={{ 
-              title: 'Premium', 
-              headerShown: false,
-              tabBarIcon: ({ color }) => <IconSymbol name="crown" size={28} color={color} /> 
+            listeners={{
+                tabPress: () => setUnreadCount(0), // Clears badge when opened
             }}
           />
 
-          
+          <Tabs.Screen
+            name="search"
+            options={{ title: 'Search', tabBarIcon: ({ color }) => <IconSymbol size={28} name="magnifyingglass" color={color} /> }}
+          />
+          <Tabs.Screen
+            name="premium"
+            options={{ title: 'Premium', tabBarIcon: ({ color }) => <IconSymbol name="crown" size={28} color={color} /> }}
+          />
           <Tabs.Screen
             name="profile"
-            options={{ 
-              title: 'Profile', 
-              headerShown: false,
-              tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} /> 
-            }}
+            options={{ title: 'Profile', tabBarIcon: ({ color }) => <IconSymbol size={28} name="person.fill" color={color} /> }}
           />
         </Tabs>
       </View>

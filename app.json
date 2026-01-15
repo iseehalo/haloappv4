@@ -15,8 +15,10 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": [
-          "audio"
-        ]
+          "audio",
+          "remote-notification"
+        ],
+        "NSNotificationsUsageDescription": "We use notifications to keep you updated on new music, trade status, and community announcements."
       }
     },
     "android": {
