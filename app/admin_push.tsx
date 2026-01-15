@@ -16,7 +16,7 @@ export default function AdminPushScreen() {
       const { data: { user } } = await supabase.auth.getUser();
       
       // PASTE YOUR ACTUAL SUPABASE USER ID HERE
-      const MY_ID = "2664d72a-4db6-4e41-8963-949bafed8922";
+      const MY_ID = "3b24ccdf-175d-4284-9fbe-1cebc9fdbe8c";
 
       if (user?.id === MY_ID) {
         setIsAdmin(true);

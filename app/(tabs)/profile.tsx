@@ -49,7 +49,7 @@ const Profile = () => {
 
         // --- ADMIN CHECK ---
         // Replace this string with your ID from Supabase Auth Dashboard
-        const MY_ADMIN_ID = "2664d72a-4db6-4e41-8963-949bafed8922";
+        const MY_ADMIN_ID = "3b24ccdf-175d-4284-9fbe-1cebc9fdbe8c";
         if (authUser.id === MY_ADMIN_ID) {
           setIsAdmin(true);
         }
